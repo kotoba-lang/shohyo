@@ -92,14 +92,58 @@ false for an empty ledger: an empty balance sheet balances trivially and says
 nothing. Conservative in the same way as `worklaw/compliant?` and
 `taxlaw/supported?`.
 
+## 会社計算規則 — the JP statement structure, read from the regulation
+
+`kotoba.shohyo` is jurisdiction-neutral: five account types and the
+accounting equation. `kotoba.shohyo.jp` adds what a Japanese statement
+actually looks like, and none of it is convention —— 会社計算規則
+(418M60000010013, revision `..._20250331_507M60000010014`, retrieved
+2026-08-18 from the e-Gov law API) states it, and `jp/provisions` quotes
+every article implemented.
+
+| | |
+|---|---|
+| 第七十三条 | 貸借対照表 = 資産 / 負債 / 純資産 |
+| 第七十四条 | 資産の部 = 流動資産 / 固定資産 / 繰延資産; 固定資産 **contains** 有形 / 無形 / 投資その他 |
+| 第八十八条 | 損益計算書 = the seven 区分, in the article's order |
+| 第八十九〜九十二条 | the 段階利益 ladder: 売上総 → 営業 → 経常 → 税引前 |
+
+### The rule a naive implementation gets wrong
+
+第八十九条第二項, repeated identically in 第九十条, 第九十一条 and 第九十二条:
+
+> 前項の規定にかかわらず、売上総損益金額が零未満である場合には、零から
+> 売上総損益金額を減じて得た額を売上総損失金額として表示しなければならない。
+
+A negative 売上総損益金額 is **not** a negative 売上総利益金額. It is a
+**positive 売上総損失金額** — a different label and a sign flip. Printing
+`-500` under 売上総利益 is the obvious implementation and is not what the
+article says, so each rung returns a `:label`, not only a number. The signed
+figure survives in `:shohyo.jp/concepts`, keyed by kanjō's names, so nothing
+is lost for a caller that wants to compare with a filing.
+
+Zero is a profit, not a loss: 零未満 is the condition, and zero is not below
+zero.
+
+**A missing section is not zero.** An absent 売上原価 is an unstated cost,
+and treating it as zero would report a gross profit equal to sales, so the
+ladder answers `:not-declared` and names every section it lacks.
+
+Measured, all seven mutations red: present a loss as a negative profit (7),
+relabel without flipping the sign (2), treat zero as a loss (1), compute the
+ladder with sections missing (1 — **by NPE rather than by assertion, which is
+weaker evidence and is recorded as such**), add 営業外費用 instead of
+subtracting it (2), let a section contradict its article's account type (1),
+flatten 固定資産's three subdivisions into peers (2).
+
 ## Maturity
 
 | | |
 |---|---|
 | Role | capability |
-| Tests | 14 tests / 45 assertions green (`clojure -M:test`) |
+| Tests | 24 tests / 99 assertions green (`clojure -M:test`) |
 | Dependencies | none |
-| Mutations | 7 applied, 7 red |
+| Mutations | 14 applied, 14 red |
 
 Measured, every mutation red: dropping unclassified accounts silently (3),
 returning an empty unclassified list (2), letting a typo'd account type
