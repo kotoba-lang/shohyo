@@ -174,6 +174,55 @@
      ;; asked the chart would call that statement whole.
      :declared entry}))
 
+(defn fold-lines
+  "Fold already-classified `lines`, all in ONE currency, into
+  `{:bs :pl :totals :equation}` — the per-currency half of a statement.
+
+  Public because `statements` is not the only caller that can hold lines.
+  Anything holding lines that came from MORE THAN ONE fold — a group's
+  member entities, a restated prior period, a segment — needs these same
+  totals and this same accounting equation, and a second implementation of
+  資産 = 負債 + 純資産 + 当期純利益 is a second thing to drift. One fold,
+  one equation.
+
+  **This is not a special case for consolidation.** It knows nothing about
+  entities, groups, parents or eliminations, and it will not tell a caller
+  whether the lines handed to it belong together: which lines make up a
+  statement is the caller's argument, exactly as the chart is. A module that
+  needed the core to know what a subsidiary is would be asking the core to
+  make a determination, which is the one thing this library refuses to do.
+
+  Every line must carry the same currency. That is the caller's obligation
+  and it is not checked here — a fold returns one statement, so it has
+  nowhere to put the answer `these were two currencies`. `statements` groups
+  by currency before calling, and so must anyone else; adding yen to dollars
+  is the bug this plane has already shipped once."
+  [lines]
+  (let [of (fn [t] (filterv #(= t (:type %)) lines))
+        sum (fn [xs] (reduce + 0 (map :presented xs)))
+        assets (of :asset)
+        liabilities (of :liability)
+        equity (of :equity)
+        revenue (of :revenue)
+        expense (of :expense)
+        net (- (sum revenue) (sum expense))
+        lhs (sum assets)
+        rhs (+ (sum liabilities) (sum equity) net)]
+    {:bs (vec (sort-by :account (concat assets liabilities equity)))
+     :pl (vec (sort-by :account (concat revenue expense)))
+     :totals {:assets (sum assets)
+              :liabilities (sum liabilities)
+              :equity (sum equity)
+              :revenue (sum revenue)
+              :expenses (sum expense)
+              :net-income net}
+     ;; 資産 = 負債 + 純資産 + 当期純利益. Checked, not assumed: a fold that
+     ;; quietly disagreed with the identity would still print two tidy
+     ;; columns.
+     :equation {:lhs lhs :rhs rhs
+                :difference (- lhs rhs)
+                :holds? (= lhs rhs)}}))
+
 (defn unclassified
   "Accounts appearing in `balances` that the chart does not classify.
 
@@ -226,32 +275,8 @@
          :shohyo/by-currency
          (into {}
                (map (fn [[currency entries]]
-                      (let [ls (map (fn [[k v]] (line chart k v)) entries)
-                            of (fn [t] (filterv #(= t (:type %)) ls))
-                            sum (fn [xs] (reduce + 0 (map :presented xs)))
-                            assets (of :asset)
-                            liabilities (of :liability)
-                            equity (of :equity)
-                            revenue (of :revenue)
-                            expense (of :expense)
-                            net (- (sum revenue) (sum expense))
-                            lhs (sum assets)
-                            rhs (+ (sum liabilities) (sum equity) net)]
-                        [currency
-                         {:bs (vec (sort-by :account (concat assets liabilities equity)))
-                          :pl (vec (sort-by :account (concat revenue expense)))
-                          :totals {:assets (sum assets)
-                                   :liabilities (sum liabilities)
-                                   :equity (sum equity)
-                                   :revenue (sum revenue)
-                                   :expenses (sum expense)
-                                   :net-income net}
-                          ;; 資産 = 負債 + 純資産 + 当期純利益. Checked, not
-                          ;; assumed: a fold that quietly disagreed with the
-                          ;; identity would still print two tidy columns.
-                          :equation {:lhs lhs :rhs rhs
-                                     :difference (- lhs rhs)
-                                     :holds? (= lhs rhs)}}])))
+                      [currency (fold-lines (mapv (fn [[k v]] (line chart k v))
+                                                  entries))]))
                by-cur)}))))
 
 (defn complete?
