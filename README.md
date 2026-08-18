@@ -263,14 +263,242 @@ required item but carrying no balance in USD is absent from the USD statement
 while still present in the chart, and a module that asked the chart would
 call that statement whole.
 
+## 連結会計 — a group, and the two things that balance while being wrong
+
+`kotoba.shohyo.renketsu` folds a group's member statements into
+連結貸借対照表 and 連結損益計算書. The core stays single-entity and knows
+nothing about groups: **consolidation composes `statements` results**, and
+the only thing the core learned is `fold-lines` (below).
+
+The library's founding sentence, with a group in it:
+
+> A consolidated balance sheet that omits a subsidiary still balances. So
+> does one that fails to eliminate an intercompany receivable against its
+> payable. Both are wrong, both look right, and a total finds neither.
+
+Measured, in this repo's own test:
+
+```clojure
+(renketsu/consolidate (dissoc group :renketsu/intercompany))
+;; the equation holds — :difference 0, :holds? true
+;; consolidated assets 400, where the right answer is 250
+;; :shohyo.renketsu/eliminations :unpaired
+;;   [{:entity "P" :account "due-from-s"      :currency "JPY" :balance  100 …}
+;;    {:entity "P" :account "investment-in-s" :currency "JPY" :balance   50 …}
+;;    {:entity "S" :account "due-to-p"        :currency "JPY" :balance -100 …}]
+```
+
+### How an unmatched intercompany balance is made unmissable
+
+A caller who declares *no* eliminations would otherwise pass cleanly: nothing
+failed, because nothing was attempted. So the claim moves to where it can be
+checked — **the chart** tags an account `:renketsu/counterparty`, the core
+forwards the whole chart entry onto the line as `:declared` without knowing
+what the key means, and any such line still standing after the declared pairs
+are applied is named with its entity, currency and amount. Named, never
+counted: `3 eliminations failed` sends someone hunting; `S / due-to-p / JPY /
+−100` hands them the row.
+
+The elimination test is that a pair's **debit-positive balances sum to zero**.
+One test covers both shapes 第六十八条 contemplates — a receivable +100
+against a payable −100, revenue −100 against an expense +100 — and it is also
+what makes elimination safe: removing a set of lines whose debit-positive
+balances sum to zero cannot move 資産 = 負債 + 純資産 + 当期純利益. A pair
+that does *not* sum to zero is **not partially applied**; the residual is
+named and both legs stay, because deciding which leg is right is a judgement
+about the transaction and not something a trial balance answers.
+
+### What was read, verbatim
+
+Four texts from the e-Gov law API on 2026-08-18, each pinned to the revision
+it was read at — `会社計算規則 第六十三条` alone does not say which of eleven
+amendments:
+
+| law | id | revision | bytes |
+|---|---|---|---|
+| 会社法 | 417AC0000000086 | `..._20260812_508AC0000000064` | 3 034 237 |
+| 会社計算規則 | 418M60000010013 | `..._20250331_507M60000010014` | 857 066 |
+| 会社法施行規則 | 418M60000010012 | `..._20240401_506M60000010011` | 1 461 146 |
+| 連結財務諸表規則 | 351M50000040028 | `..._20260331_508M60000002028` | 949 702 |
+
+Fifteen provisions are quoted in `provisions`, all `:read-from-source`. Ten
+back a check; five are quoted and marked `:enforced? false`, because a cited
+article that silently backs no check reads exactly like one that does.
+
+### The thing everybody quotes that the regulation does not say
+
+Every textbook says consolidation eliminates 内部取引高 and 債権債務.
+**Neither phrase occurs in 会社計算規則.** Measured, with its denominator, so
+that an absence nobody counted cannot be mistaken for one nobody looked for:
+
+| | 内部取引 | 未実現 | 債権債務 |
+|---|---|---|---|
+| 会社計算規則, 180 articles | 0 | 0 | 0 |
+| 連結財務諸表規則, 399 main articles | 0 | 0 | 1 |
+
+That single hit is 第十五条の四の二 — a 関連当事者 **note**, not an
+elimination rule. What the regulation actually says is 第六十八条, and only
+投資と資本 is named; everything else is
+「その他必要とされる連結会社相互間の項目の相殺消去」. The itemised vocabulary
+is 企業会計基準第22号's, an ASBJ standard that is not on e-Gov and **was not
+read** — which is why 未実現損益 is refused rather than approximated.
+
+### The rule a naive implementation gets wrong
+
+第六十三条第一項ただし書 and 第二項 are **two different modalities**:
+
+> 一項 …ただし、次のいずれかに該当する子会社は、連結の範囲に**含めないものとする**。
+>
+> 二項 …重要性の乏しいものは、連結の範囲から**除くことができる**。
+
+第一項's two grounds (支配が一時的 / 著しく誤らせるおそれ) are an instruction
+**not to include**. 第二項's materiality ground is a **permission** to
+exclude. One `:excludable?` flag for both lets a caller consolidate a
+subsidiary the regulation forbids consolidating, and the statement balances
+anyway. So `exclusion-grounds` carries `:modality`, and a mandatory ground
+declared alongside `:included` is a scope problem.
+
+### The second rule: control is not a percentage
+
+会社法施行規則 第三条第三項 opens its own definition with an exception —
+「（財務上又は事業上の関係からみて…支配していないことが明らかであると認められる
+場合を除く。）」 — so a holding over 百分の五十 is not **sufficient**; and
+第三号 reaches 「自己の計算において議決権を所有していない場合を含み」, i.e.
+**zero** voting rights, where 自己所有等議決権数 exceeds half. So a holding is
+not **necessary** either.
+
+None of 緊密な関係, 同意している者, 支配する契約等 or
+「支配していることが推測される事実」 is in a trial balance. **A library cannot
+observe control.** `:renketsu/control` is a required declaration, a declared
+`:renketsu/voting-rights` does not substitute for it (and is quoted back in
+the problem detail, so nobody thinks it was overlooked), and an unstated scope
+is its own answer.
+
+### What it computes, and what it refuses
+
+| computes | |
+|---|---|
+| the group's 貸借対照表 / 損益計算書 | per currency, from the members' folded lines |
+| the accounting equation on the **group** | per currency; `out-of-balance` answers where |
+| intercompany elimination | where the caller supplies the pairing and the legs offset |
+| whether a 非支配株主持分 **arises** | exact integer comparison of a declared holding |
+| whether 資本連結 left anything standing | any subsidiary equity line still there is named |
+
+| refuses | why |
+|---|---|
+| deriving 連結の範囲 | 支配 is a determination (会社法施行規則 第三条第三項); the evidence is not in a trial balance |
+| 未実現損益 | needs, per item still on hand, the price it moved at and the cost it moved from — a closing balance is neither. And 企業会計基準第22号 was not read |
+| the **amount** of 非支配株主持分 | needs the subsidiary's equity at acquisition and the carrying amount of the investment |
+| 資本連結 as a computation | same figures; it is offered as an ordinary declared pair instead, and a residual on one is named as のれん-or-NCI |
+| currency translation | 第七十六条第九項第二号 presumes rates and states none; the rates are 「外貨建取引等会計処理基準」's, unread |
+| 持分法 (第六十九条) | needs the investee's own statements |
+| 連結株主資本等変動計算書 / 連結注記表 | 連結計算書類 is four documents (第六十一条第一項); this produces two |
+
+Each refusal is a named reason, listed in `catalog/out-of-scope` rather than
+left to be inferred from silence.
+
+### Currencies still do not merge
+
+The members' lines are grouped by currency **before** folding, so a group
+reporting in JPY and USD gets two statements side by side and never one total.
+`translation` then says so out loud and refuses conformance, rather than
+inventing a rate. Asserted directly, because a sibling library shipped exactly
+this bug the same day by summing ¥100,000 and $500 into 100500:
+
+```clojure
+(totals r "JPY")  ;; :assets 350
+(totals r "USD")  ;; :assets 500
+;; and no total anywhere is 850
+```
+
+A holding is `[numerator denominator]`, two integers, and **nothing divides**:
+ClojureScript has no distinct float type — `1.0` reads as `1` — and money is
+arithmetic.
+
+### Four answers, one of which is a pass
+
+| `:shohyo.renketsu/coverage` | |
+|---|---|
+| `:unread` | no provision is `:read-from-source` — nothing may be asserted |
+| `:scope-not-declared` | no members; 連結の範囲 was never stated |
+| `:unusable-scope` | the declaration does not parse, and no figures are produced |
+| `:checked` | answered, per currency, and **still need not be conformant** |
+
+`consolidated?` is false for all but the last, like `complete?`,
+`presented?` and `taxlaw/supported?`. The first three carry no
+`:shohyo.renketsu/conformant?` key at all.
+
+**It is reachable.** An earlier draft refused 資本連結 unconditionally, which
+made the boolean false for every group with a subsidiary in it — and a
+predicate no input can turn true tells nobody anything, the same objection as
+a check that never goes red. It is now answered from the data: no subsidiary
+equity standing, every pair offsetting, one currency, wholly owned, members
+complete, 未実現損益 addressed.
+
+### The one thing the core learned
+
+`fold-lines` — given already-classified lines in one currency, return
+`{:bs :pl :totals :equation}`. `statements` now calls it, and so does the
+group fold. **Not a special case for consolidation**: it knows nothing about
+entities and will not say whether the lines handed to it belong together, the
+way the chart is the caller's argument. Anything holding lines from more than
+one fold — a group's members, a restated period, a segment — needs the same
+totals and the same equation, and a second implementation of
+資産 = 負債 + 純資産 + 当期純利益 is a second thing to drift.
+
+### Mutations — `kotoba.shohyo.renketsu` and `fold-lines`
+
+**This section covers only those.** The 24 for `kotoba.shohyo.ifrs` and the
+14 + 7 for the core and `kotoba.shohyo.jp` are separate runs; a green table
+here says nothing about them, and a reader who adds the numbers up is quoting
+the wrong denominator.
+
+Measured, 35 + 16 = **51 applied, 51 red, 0 survivors**. That was not the
+first run. Two blind rounds, both written from the source without consulting
+the tests, produced **three survivors, and all three were real**:
+
+| survivor | what it exposed |
+|---|---|
+| `:ownership-denominator-may-be-zero` | `[0 0]` was refused by `(pos? d)` **and by nothing else** — the existing `[1 0]` case is caught by `numerator <= denominator` instead, so that clause had never been exercised. It matters: `wholly-owned?` answers **true** for `[0 0]`, being an exact integer identity, so a subsidiary declared `[0 0]` would have consolidated with no 非支配株主持分 arising from a holding that is not a holding. |
+| `:the-nci-scan-includes-the-parent` | no test had ever put an `:renketsu/ownership` on the parent, so the `not= id parent` guard was unexercised. The guard is not an implementation detail: 非支配株主 under 第七十六条第一項第二号ホ are the minority **in a subsidiary**, and a parent's own outside shareholders are 株主資本 — every listed parent has them and none is a 非支配株主. |
+| `:the-group-is-complete-with-unclassified-accounts` | the consolidated result is documented as being shaped like a single-entity one so `shohyo/complete?` composes onto it — and leaving its coverage `:complete` while a member was short survived the whole suite, because the group was still non-conformant for a *different* reason. A caller reaching for `complete?` instead of `consolidated?` would have been told a group short by a known account was whole. |
+
+The other 48 died first time, including the ones that matter most:
+`:currencies-are-folded-together` (which reddens exactly
+`nothing-is-ever-added-across-currencies`, and nothing else — a precise kill,
+not a broad one), `:eliminated-lines-are-not-removed`,
+`:mandatory-exclusion-may-be-included`, `:a-residual-eliminates-anyway`,
+`:unpaired-counterparty-lines-are-not-named`,
+`:the-consolidated-equation-is-not-checked` and
+`:an-unread-provision-still-asserts`.
+
+### The portable runner
+
+`test/run_portable.cljs` did not exist; the repo's portability was a claim
+about a file extension. It now runs the whole suite under nbb and **exits
+non-zero** — `cljs.test/run-tests` prints and returns, so a runner that only
+printed would report a red suite with exit 0 to every shell, harness and gate
+that reads one.
+
+It also compares the suite list against `test/` on disk. The quiet way this
+runner breaks is that someone adds `foo_test.cljc` and does not add it here:
+the ClojureScript run silently stops covering it while `clojure -M:test`,
+which discovers namespaces by scanning, keeps passing. The *other* direction —
+a namespace listed but not loaded — is not guarded, because nbb throws
+`No namespace: … found` before anything runs, and guarding the direction that
+cannot happen while leaving the one that can is how a check becomes
+decoration. Both live paths were demonstrated red before landing, as was the
+`COULD NOT LOOK` answer for being run from the wrong directory, which is its
+own exit rather than a clean scan.
+
 ## Maturity
 
 | | |
 |---|---|
 | Role | capability |
-| Tests | 52 tests / 311 assertions green (`clojure -M:test`) |
+| Tests | 104 tests / 536 assertions green under **both** `clojure -M:test` and `nbb --classpath src:test test/run_portable.cljs` |
 | Dependencies | none |
-| Mutations | 14 + 7 + 24 applied, all red |
+| Mutations | 14 + 7 + 24 + 51 applied, all red |
 
 Measured, every mutation red: dropping unclassified accounts silently (3),
 returning an empty unclassified list (2), letting a typo'd account type
