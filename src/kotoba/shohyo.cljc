@@ -149,11 +149,30 @@
   (if (= :credit (get-in account-types [type :normal])) (- balance) balance))
 
 (defn- line [chart [account currency] {:keys [balance]}]
-  (let [{:keys [type concept]} (get chart account)]
+  (let [entry (get chart account)
+        {:keys [type concept]} entry]
     {:account account :currency currency :type type :concept concept
      :balance balance
      :presented (presented type balance)
-     :statement (get-in account-types [type :statement])}))
+     :statement (get-in account-types [type :statement])
+     ;; The chart entry, verbatim, carried onto the line.
+     ;;
+     ;; The core knows five account types and an equation, and deliberately
+     ;; knows no jurisdiction. A presentation module — 会社計算規則 in
+     ;; `kotoba.shohyo.jp`, IAS 1 in `kotoba.shohyo.ifrs`, or one nobody has
+     ;; written — needs to read ITS OWN declaration off the folded statement.
+     ;;
+     ;; This is not a hook for one framework: the core never learns any
+     ;; framework's key, it forwards whatever the caller declared and lets the
+     ;; module recognise its own. That is why the whole entry travels rather
+     ;; than a named field.
+     ;;
+     ;; And it must travel on the LINE, not be re-joined from the chart. The
+     ;; statement is per currency; the chart is not. An account declared for a
+     ;; required line item but carrying no balance in USD is absent from the
+     ;; USD statement while still present in the chart, and a module that
+     ;; asked the chart would call that statement whole.
+     :declared entry}))
 
 (defn unclassified
   "Accounts appearing in `balances` that the chart does not classify.
