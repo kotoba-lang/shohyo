@@ -522,14 +522,46 @@ decoration. Both live paths were demonstrated red before landing, as was the
 `COULD NOT LOOK` answer for being run from the wrong directory, which is its
 own exit rather than a clean scan.
 
+## `kotoba.shohyo.genka` — 売上原価の内訳, and where the authority runs out
+
+会社計算規則 names 売上原価 as one of the seven 区分 and says nothing about
+what is inside it. A manufacturer's chart therefore has nowhere to put
+期首材料棚卸高, 労務費 or 仕掛品. Measured 2026-08-20 against a live
+MoneyForward chart for one 製造業 株式会社: **35 of 200 accounts across 10
+categories** came back `:unknown-section` for exactly this reason.
+
+`genka` is the one namespace here whose authority runs out partway down, and
+it is built to say so:
+
+| | backed by | in the code |
+|---|---|---|
+| the three 科目 of 売上原価, third a **控除科目** | 財務諸表等規則 第七十五条第一項 — **law, read** | `:genka/coverage :checked`, article quoted |
+| that 当期製品製造原価 carries an attached 明細書 | 第七十五条第二項 — **law, read** | `:requires-schedule` |
+| 材料費 / 労務費 / 経費 inside that 明細書 | 原価計算基準 (企業会計審議会 1962) — **not a 法令, not read** | `:source :observed`, `:genka/coverage :checked-arithmetic-only` |
+
+材料費 and 労務費 occur **zero** times in the full text of 財務諸表等規則; the
+three-way split is not in the regulation. So `cost-of-goods-manufactured`
+produces the figure — refusing to produce it helps nobody — and carries
+`:genka/authority` with `:shape-read? false` **in the returned map**, not in a
+var a caller has to go and find. Every other number in this library is backed
+by a quoted article, and a caller must be able to tell this one apart without
+looking it up.
+
+The 控除科目 trap appears twice more here. 第七十五条第一項第三号 makes
+期末棚卸高 a deduction in the same sentence that names the other two items,
+and 期末仕掛品棚卸高 and 他勘定振替高 sit the same way inside the 明細書.
+Adding any of the three overstates the cost by twice that item — **and the
+accounting equation still holds**, so `out-of-balance` never sees it. This is
+the same shape as 自己株式 under 会社計算規則 第七十六条第二項.
+
 ## Maturity
 
 | | |
 |---|---|
 | Role | capability |
-| Tests | 116 tests / 602 assertions green under **both** `clojure -M:test` and `nbb --classpath src:test test/run_portable.cljs` |
+| Tests | 124 tests / 641 assertions green under **both** `clojure -M:test` and `nbb --classpath src:test test/run_portable.cljs` |
 | Dependencies | none |
-| Mutations | 14 + 7 + 24 + 51 + 4 applied, all red |
+| Mutations | 14 + 7 + 24 + 51 + 4 + 4 applied, all red |
 
 Measured, every mutation red: dropping unclassified accounts silently (3),
 returning an empty unclassified list (2), letting a typo'd account type
