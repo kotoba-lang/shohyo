@@ -105,8 +105,39 @@ every article implemented.
 |---|---|
 | 第七十三条 | 貸借対照表 = 資産 / 負債 / 純資産 |
 | 第七十四条 | 資産の部 = 流動資産 / 固定資産 / 繰延資産; 固定資産 **contains** 有形 / 無形 / 投資その他 |
+| 第七十六条 | 純資産の部 = 株主資本 / 評価・換算差額等 / 株式引受権 / 新株予約権; 株主資本 **contains** six, 自己株式 as a **控除項目**; 資本剰余金 and 利益剰余金 each contain two; 評価・換算差額等 contains five, of which two are 連結貸借対照表に限る |
 | 第八十八条 | 損益計算書 = the seven 区分, in the article's order |
 | 第八十九〜九十二条 | the 段階利益 ladder: 売上総 → 営業 → 経常 → 税引前 |
+| 第九十三条 | 法人税等 and 法人税等調整額, 「税引前当期純利益金額…の次に」 |
+| 第九十四条 | 当期純損益金額 — the fifth rung, with the same 零未満 sign flip |
+
+### Two more rules a naive implementation gets wrong
+
+**自己株式 is a 控除項目** (第七十六条第二項後段: 「第五号に掲げる項目は、
+控除項目とする」). A chart that adds it into 株主資本 overstates equity by
+twice the treasury holding — and **the accounting equation still holds**, so
+`out-of-balance` never sees it. `deduction?` answers this per section rather
+than leaving it to the caller's memory.
+
+**法人税等調整額 is signed** (第九十三条第一項第二号 calls it a 調整額). Every
+other section total is a natural positive magnitude, but a 税効果 credit is a
+negative charge and *raises* 当期純利益; forcing it positive moves the figure
+by twice the adjustment.
+
+### A container section is not a classification
+
+第七十四条第二項, 第七十六条第二項, 第四項, 第五項 and 第七項 all say
+区分／細分しなければならない. An account parked directly on 固定資産 or
+株主資本 is therefore **not classified yet**, and `section-problems` says so.
+`:subdivided-by` marks the containers whose subdivision the regulation
+*mandates*, as distinct from 第七十六条第六項 and 第八項, which say
+ことができる and are left alone.
+
+`subsections` returns them **in the article's 号 order, not map order** —
+`bs-sections` has more than eight entries, so it is a hash-map whose seq
+order is unspecified, and a subdivision listed back in hash order reads as if
+the regulation numbered it that way. Measured: the test caught exactly this
+before the sort was added.
 
 ### The rule a naive implementation gets wrong
 
@@ -496,9 +527,9 @@ own exit rather than a clean scan.
 | | |
 |---|---|
 | Role | capability |
-| Tests | 104 tests / 536 assertions green under **both** `clojure -M:test` and `nbb --classpath src:test test/run_portable.cljs` |
+| Tests | 116 tests / 602 assertions green under **both** `clojure -M:test` and `nbb --classpath src:test test/run_portable.cljs` |
 | Dependencies | none |
-| Mutations | 14 + 7 + 24 + 51 applied, all red |
+| Mutations | 14 + 7 + 24 + 51 + 4 applied, all red |
 
 Measured, every mutation red: dropping unclassified accounts silently (3),
 returning an empty unclassified list (2), letting a typo'd account type

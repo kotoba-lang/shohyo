@@ -77,10 +77,19 @@
 ;; ---------------------------------------------------------------------------
 
 (deftest the-seven-pl-sections-are-the-articles-seven
-  (is (= 7 (count jp/pl-sections)))
-  (is (= ["売上高" "売上原価" "販売費及び一般管理費" "営業外収益"
-          "営業外費用" "特別利益" "特別損失"]
-         (mapv :jp (sort-by :order (vals jp/pl-sections))))))
+  (testing "第八十八条第一項 names seven and only seven — the 税等 items below
+            them come from 第九十三条 and must not be counted as an eighth 区分"
+    (let [eighty-eight (filter #(str/starts-with? (:provision %) "第八十八条")
+                               (vals jp/pl-sections))]
+      (is (= 7 (count eighty-eight)))
+      (is (= ["売上高" "売上原価" "販売費及び一般管理費" "営業外収益"
+              "営業外費用" "特別利益" "特別損失"]
+             (mapv :jp (sort-by :order eighty-eight))))))
+  (testing "and 第九十三条 puts its items AFTER them, per 「…の次に表示」"
+    (let [ninety-three (filter #(str/starts-with? (:provision %) "第九十三条")
+                               (vals jp/pl-sections))]
+      (is (= 5 (count ninety-three)))
+      (is (every? #(> (:order %) 7) ninety-three)))))
 
 (deftest fixed-assets-contain-three-rather-than-being-a-peer
   (testing "第七十四条第二項 subdivides 固定資産; flattening them into peers
@@ -108,7 +117,8 @@
   (let [p jp/provisions]
     (is (= "418M60000010013" (:law/id p)))
     (is (= "2026-08-18" (:retrieved-at p)))
-    (is (= 8 (count (:articles p))))
+    (is (= 16 (count (:articles p))))
+    (is (apply distinct? (map :article (:articles p))) "no article quoted twice")
     (doseq [{:keys [article quote]} (:articles p)]
       (is (str/starts-with? article "第") (str article))
       (is (> (count quote) 30) (str article " quote is too short to be the text")))
@@ -117,3 +127,145 @@
       (doseq [a ["第八十九条" "第九十条" "第九十一条" "第九十二条"]]
         (let [q (:quote (first (filter #(= a (:article %)) (:articles p))))]
           (is (str/includes? q "零未満") (str a " omits the 零未満 clause")))))))
+
+;; ---------------------------------------------------------------------------
+;; 純資産の部 — 第七十六条
+;; ---------------------------------------------------------------------------
+
+(deftest equity-has-four-sections-not-one
+  (testing "第七十六条第一項第一号: イ株主資本 ロ評価・換算差額等 ハ株式引受権
+            ニ新株予約権 — a 貸借対照表 with only 株主資本 has nowhere to put
+            the other three, and they are not optional"
+    (is (= #{:shareholders-equity :valuation-adjustments
+             :share-subscription-rights :subscription-rights-to-shares}
+           (set (keep (fn [[k v]]
+                        (when (and (= :equity (:type v)) (nil? (:parent v))) k))
+                      jp/bs-sections))))))
+
+(deftest shareholders-equity-has-the-six-of-paragraph-two
+  (testing "第七十六条第二項 一資本金 二新株式申込証拠金 三資本剰余金
+            四利益剰余金 五自己株式 六自己株式申込証拠金"
+    (is (= [:capital-stock :new-share-subscription-deposits :capital-surplus
+            :retained-earnings :treasury-stock
+            :treasury-stock-subscription-deposits]
+           (jp/subsections :shareholders-equity)))))
+
+(deftest treasury-stock-is-a-deduction
+  (testing "第七十六条第二項後段: 第五号に掲げる項目は、控除項目とする —
+            summing it into 株主資本 overstates equity by twice the holding
+            AND the accounting equation still holds, so nothing else catches it"
+    (is (true? (jp/deduction? :treasury-stock)))
+    (is (false? (jp/deduction? :capital-stock)))
+    (testing "第七十六条第八項 does the same for 自己新株予約権"
+      (is (true? (jp/deduction? :treasury-subscription-rights))))))
+
+(deftest capital-and-retained-surplus-subdivide
+  (testing "第七十六条第四項 / 第五項"
+    (is (= [:legal-capital-surplus :other-capital-surplus]
+           (jp/subsections :capital-surplus)))
+    (is (= [:legal-retained-earnings :other-retained-earnings]
+           (jp/subsections :retained-earnings)))))
+
+(deftest two-valuation-items-are-consolidated-only
+  (testing "第七十六条第七項ただし書: 第四号及び第五号に掲げる項目は、
+            連結貸借対照表に限る"
+    (is (true? (jp/consolidated-only? :foreign-currency-translation-adjustment)))
+    (is (true? (jp/consolidated-only? :retirement-benefits-adjustment)))
+    (is (false? (jp/consolidated-only? :deferred-hedge-gains-losses))))
+  (testing "and section-problems says so on a standalone sheet, but not on a
+            consolidated one"
+    (let [chart {"為替換算調整勘定"
+                 {:section :foreign-currency-translation-adjustment :type :equity}}]
+      (is (= [:consolidated-only-section]
+             (mapv :problem (jp/section-problems chart))))
+      (is (empty? (jp/section-problems chart {:consolidated? true}))))))
+
+(deftest a-container-section-is-not-a-classification
+  (testing "第七十六条第二項 区分しなければならない — an account parked on
+            株主資本 itself has not been classified yet"
+    (is (= [:section-requires-subdivision]
+           (mapv :problem
+                 (jp/section-problems {"資本金" {:section :shareholders-equity
+                                                 :type :equity}})))))
+  (testing "第七十四条第二項 has said the same about 固定資産 since day one"
+    (is (= [:section-requires-subdivision]
+           (mapv :problem
+                 (jp/section-problems {"建物" {:section :fixed-assets :type :asset}})))))
+  (testing "the leaf it should have used is clean"
+    (is (empty? (jp/section-problems {"資本金" {:section :capital-stock :type :equity}}))))
+  (testing "第七十六条第六項 and 第八項 say ことができる, so 新株予約権 is not
+            a mandatory container"
+    (is (false? (jp/requires-subdivision? :subscription-rights-to-shares)))
+    (is (empty? (jp/section-problems
+                 {"新株予約権" {:section :subscription-rights-to-shares :type :equity}})))))
+
+;; ---------------------------------------------------------------------------
+;; 税等 and 当期純損益金額 — 第九十三条 / 第九十四条
+;; ---------------------------------------------------------------------------
+
+(def ^:private taxed
+  (assoc profitable :income-taxes 60 :deferred-income-taxes 15))
+
+(deftest the-fifth-rung-is-computed-from-article-94
+  (let [r (jp/stage-profits taxed)
+        ni (:shohyo.jp/net-income r)]
+    (is (= :checked (:shohyo.jp/coverage ni)))
+    (is (= 225 (:amount (:shohyo.jp/pretax r))) "1000-600-200+50-30+10-5")
+    (is (= 150 (:amount ni)) "225 - (60 + 15)")
+    (is (= "当期純利益金額" (:label ni)))
+    (is (= "第九十四条" (:article ni)))
+    (is (= 150 (get (:shohyo.jp/concepts r) "net-income")))))
+
+(deftest article-94-paragraph-2-flips-like-the-others
+  (let [ni (:shohyo.jp/net-income (jp/stage-profits (assoc taxed :income-taxes 400)))]
+    (is (= "当期純損失金額" (:label ni)))
+    (is (= :loss (:sign ni)))
+    (is (= 190 (:amount ni)) "positive magnitude of 225 - 415")))
+
+(deftest the-tax-effect-adjustment-is-signed
+  (testing "第九十三条第一項第二号 calls it a 調整額 — a 税効果 credit is a
+            negative charge and RAISES 当期純利益. Forcing it positive would
+            move the figure by twice the adjustment"
+    (let [credit (:shohyo.jp/net-income
+                  (jp/stage-profits (assoc taxed :deferred-income-taxes -15)))]
+      (is (= 180 (:amount credit)) "225 - (60 - 15), not 225 - (60 + 15) = 150"))))
+
+(deftest an-unstated-tax-charge-is-not-a-zero-one
+  (testing "the four rungs of 第八十八条 still run — running out of inputs one
+            rung early is not the ladder failing"
+    (let [r (jp/stage-profits profitable)]
+      (is (= :checked (:shohyo.jp/coverage r)))
+      (is (= 225 (:amount (:shohyo.jp/pretax r))))
+      (is (= :not-declared (:shohyo.jp/coverage (:shohyo.jp/net-income r))))
+      (is (= [:income-taxes :deferred-income-taxes]
+             (:shohyo.jp/missing-sections (:shohyo.jp/net-income r))))
+      (is (not (contains? (:shohyo.jp/concepts r) "net-income"))
+          "an absent rung must not appear as a computed concept")))
+  (testing "one present and one absent still refuses"
+    (let [ni (:shohyo.jp/net-income
+              (jp/stage-profits (assoc profitable :income-taxes 60)))]
+      (is (= :not-declared (:shohyo.jp/coverage ni)))
+      (is (= [:deferred-income-taxes] (:shohyo.jp/missing-sections ni))))))
+
+(deftest the-conditional-tax-items-default-to-zero-because-the-article-conditions-them
+  (testing "第九十三条第二項 ある場合 / 第三項 …がある場合には — absent really
+            is zero here, unlike 第一項各号"
+    (is (= 150 (:amount (:shohyo.jp/net-income (jp/stage-profits taxed)))))
+    (testing "還付税額 is ADDED per 第九十四条第一項第二号"
+      (is (= 170 (:amount (:shohyo.jp/net-income
+                           (jp/stage-profits (assoc taxed :tax-refund-on-reassessment 20)))))))
+    (testing "納付税額 is DEDUCTED per 第九十四条第一項第四号"
+      (is (= 130 (:amount (:shohyo.jp/net-income
+                           (jp/stage-profits (assoc taxed :tax-payment-on-reassessment 20)))))))
+    (testing "国際最低課税額に対する法人税等 is deducted per 第九十四条第一項第三号"
+      (is (= 120 (:amount (:shohyo.jp/net-income
+                           (jp/stage-profits (assoc taxed :global-minimum-tax 30)))))))))
+
+(deftest every-section-cites-the-paragraph-it-came-from
+  (testing "the standing rule: a claim that is ENFORCED must be read"
+    (is (every? :provision (vals jp/bs-sections)))
+    (is (every? :provision (vals jp/pl-sections)))
+    (let [quoted (set (map :article (:articles jp/provisions)))]
+      (doseq [a ["第七十六条第一項第一号" "第七十六条第二項" "第七十六条第四項"
+                 "第七十六条第五項" "第七十六条第七項" "第九十三条第一項" "第九十四条"]]
+        (is (contains? quoted a) (str a " is enforced above and must be quoted"))))))
