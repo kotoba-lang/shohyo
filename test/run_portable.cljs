@@ -38,13 +38,15 @@
             [kotoba.shohyo-test]
             [kotoba.shohyo.jp-test]
             [kotoba.shohyo.ifrs-test]
-            [kotoba.shohyo.renketsu-test]))
+            [kotoba.shohyo.renketsu-test]
+            [kotoba.shohyo.genka-test]))
 
 (def ^:private suite
   '[kotoba.shohyo-test
     kotoba.shohyo.jp-test
     kotoba.shohyo.ifrs-test
-    kotoba.shohyo.renketsu-test])
+    kotoba.shohyo.renketsu-test
+    kotoba.shohyo.genka-test])
 
 (defn- test-files
   "Every `*_test.cljc` under `dir`, as a path relative to the test root."
