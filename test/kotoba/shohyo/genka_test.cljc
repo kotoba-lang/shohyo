@@ -1,6 +1,6 @@
 (ns kotoba.shohyo.genka-test
   (:require [clojure.test :refer [deftest is testing]]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [kotoba.shohyo.genka :as genka]))
 
 ;; ---------------------------------------------------------------------------

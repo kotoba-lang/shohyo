@@ -1,6 +1,6 @@
 (ns kotoba.shohyo.renketsu-test
   (:require [clojure.test :refer [deftest is testing]]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [kotoba.shohyo :as shohyo]
             [kotoba.shohyo.renketsu :as r]))
 

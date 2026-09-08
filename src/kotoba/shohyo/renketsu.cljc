@@ -126,7 +126,7 @@
   whole chart entry onto each line as `:declared` without knowing what the key
   means, and that is what makes an unmatched intercompany balance
   unmissable — see `eliminations`."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [kotoba.shohyo :as shohyo]))
 
 ;; ---------------------------------------------------------------------------
