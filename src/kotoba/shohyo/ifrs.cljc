@@ -77,7 +77,7 @@
 
   The core forwards the whole chart entry onto each line as `:declared`
   without knowing what any of these keys mean."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 ;; ---------------------------------------------------------------------------
 ;; provenance — what was read, from where, and what was not

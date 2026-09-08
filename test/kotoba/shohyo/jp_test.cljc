@@ -1,6 +1,6 @@
 (ns kotoba.shohyo.jp-test
   (:require [clojure.test :refer [deftest is testing]]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [kotoba.shohyo.jp :as jp]))
 
 (def ^:private profitable

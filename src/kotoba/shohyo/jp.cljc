@@ -42,7 +42,7 @@
   classified yet, and `section-problems` says so — `:subdivided-by` marks the
   containers whose subdivision the regulation MANDATES, as distinct from
   第七十六条第六項 and 第八項, which say ことができる and are left alone."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 ;; ---------------------------------------------------------------------------
 ;; 貸借対照表 — 第七十三条 to 第七十六条

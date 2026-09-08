@@ -53,7 +53,7 @@
   given; liabilities, equity and revenue are credit-normal and are presented
   negated, so a statement reads in the sign an accountant expects. The raw
   debit-positive figure stays on each line as `:balance` so nothing is lost."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             #?(:clj [clojure.edn :as edn] :cljs [cljs.reader :as edn])
             #?(:clj [clojure.java.io :as io])))
 

@@ -1,6 +1,6 @@
 (ns kotoba.shohyo.ifrs-test
   (:require [clojure.test :refer [deftest is testing]]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [kotoba.shohyo :as shohyo]
             [kotoba.shohyo.ifrs :as ifrs]))
 
