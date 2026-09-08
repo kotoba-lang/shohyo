@@ -33,7 +33,7 @@
   one that can, is how a check becomes decoration."
   (:require ["node:fs" :as fs]
             ["node:path" :as path]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [cljs.test :as t]
             [kotoba.shohyo-test]
             [kotoba.shohyo.jp-test]
