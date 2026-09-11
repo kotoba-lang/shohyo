@@ -513,7 +513,7 @@ that reads one.
 
 It also compares the suite list against `test/` on disk. The quiet way this
 runner breaks is that someone adds `foo_test.cljc` and does not add it here:
-the ClojureScript run silently stops covering it while `clojure -M:test`,
+the ClojureScript run silently stops covering it while `kbb -M:test`,
 which discovers namespaces by scanning, keeps passing. The *other* direction —
 a namespace listed but not loaded — is not guarded, because nbb throws
 `No namespace: … found` before anything runs, and guarding the direction that
@@ -559,7 +559,7 @@ the same shape as 自己株式 under 会社計算規則 第七十六条第二項
 | | |
 |---|---|
 | Role | capability |
-| Tests | 124 tests / 641 assertions green under **both** `clojure -M:test` and `nbb --classpath src:test test/run_portable.cljk` |
+| Tests | 124 tests / 641 assertions green under **both** `kbb -M:test` and `kbb --backend sci --classpath src:test test/run_portable.cljk` |
 | Dependencies | none |
 | Mutations | 14 + 7 + 24 + 51 + 4 + 4 applied, all red |
 
@@ -576,7 +576,7 @@ credit-normal accounts unnegated (9).
 
 ### Mutations — `kotoba.shohyo.ifrs` only
 
-`nbb tools/check-mutations.cljk` then `nbb tools/mutate.cljk`. **This table
+`kbb --backend sci tools/check-mutations.cljk` then `kbb --backend sci tools/mutate.cljk`. **This table
 covers only the IFRS module and the one line it added to the core.** The
 fourteen and seven mutations recorded above for the core and for
 `kotoba.shohyo.jp` are separate runs; a green table here says nothing about
