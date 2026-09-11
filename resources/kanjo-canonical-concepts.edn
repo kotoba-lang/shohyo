@@ -8,7 +8,7 @@
 ;; rather than asserted in prose, and the workspace already runs a
 ;; verify-vendored-copies detector over copies that name their upstream.
 ;;
-;; Refresh: nbb tools/refresh_concepts.cljs <path-to-kanjo>
+;; Refresh: kbb --backend sci tools/refresh_concepts.cljk <path-to-kanjo>
 [
   {:concept/name "revenue" :concept/statement :pl :concept/label "Revenue / 売上高"}
   {:concept/name "gross-profit" :concept/statement :pl :concept/label "Gross profit / 売上総利益"}

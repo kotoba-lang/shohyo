@@ -1,10 +1,10 @@
 (ns run-portable
   "Run the whole suite under nbb, and EXIT NON-ZERO IF IT IS NOT GREEN.
 
-      nbb --classpath src:test test/run_portable.cljk
+      kbb --backend sci --classpath src:test test/run_portable.cljk
 
   Every namespace in this library is `.cljc` and is meant to run on both
-  runtimes. `clojure -M:test` answers for the JVM; nothing answered for
+  runtimes. `kbb -M:test` answers for the JVM; nothing answered for
   ClojureScript until this file existed, so `portable` was a claim about a
   file extension rather than a measurement.
 
@@ -19,7 +19,7 @@
 
   ## Why the suite list is compared with the disk
 
-  `clojure -M:test` discovers test namespaces by scanning the test path. This
+  `kbb -M:test` discovers test namespaces by scanning the test path. This
   runner cannot — the list below is written by hand — so the way it breaks is
   that someone adds `foo_test.cljc` and does not add it here. The suite then
   shrinks, and the summary still says `0 failures`. The JVM run would still
@@ -93,7 +93,7 @@
       (seq missed)
       (println (str "TEST FILES NOT IN THE SUITE: " (pr-str missed)
                     "\nThe ClojureScript run silently stopped covering them "
-                    "while `clojure -M:test` kept passing.")))
+                    "while `kbb -M:test` kept passing.")))
     (when (zero? (:test m))
       (println "\nNO TESTS RAN — refusing to report a pass."))
     (js/process.exit (if (or (pos? bad) (not looked?) (seq missed) (zero? (:test m)))
