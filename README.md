@@ -505,7 +505,7 @@ not a broad one), `:eliminated-lines-are-not-removed`,
 
 ### The portable runner
 
-`test/run_portable.cljs` did not exist; the repo's portability was a claim
+`test/run_portable.cljk` did not exist; the repo's portability was a claim
 about a file extension. It now runs the whole suite under nbb and **exits
 non-zero** — `cljs.test/run-tests` prints and returns, so a runner that only
 printed would report a red suite with exit 0 to every shell, harness and gate
@@ -559,7 +559,7 @@ the same shape as 自己株式 under 会社計算規則 第七十六条第二項
 | | |
 |---|---|
 | Role | capability |
-| Tests | 124 tests / 641 assertions green under **both** `clojure -M:test` and `nbb --classpath src:test test/run_portable.cljs` |
+| Tests | 124 tests / 641 assertions green under **both** `clojure -M:test` and `nbb --classpath src:test test/run_portable.cljk` |
 | Dependencies | none |
 | Mutations | 14 + 7 + 24 + 51 + 4 + 4 applied, all red |
 
@@ -576,7 +576,7 @@ credit-normal accounts unnegated (9).
 
 ### Mutations — `kotoba.shohyo.ifrs` only
 
-`nbb tools/check-mutations.cljs` then `nbb tools/mutate.cljs`. **This table
+`nbb tools/check-mutations.cljk` then `nbb tools/mutate.cljk`. **This table
 covers only the IFRS module and the one line it added to the core.** The
 fourteen and seven mutations recorded above for the core and for
 `kotoba.shohyo.jp` are separate runs; a green table here says nothing about
