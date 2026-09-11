@@ -1,7 +1,7 @@
 (ns run-portable
   "Run the whole suite under nbb, and EXIT NON-ZERO IF IT IS NOT GREEN.
 
-      nbb --classpath src:test test/run_portable.cljs
+      nbb --classpath src:test test/run_portable.cljk
 
   Every namespace in this library is `.cljc` and is meant to run on both
   runtimes. `clojure -M:test` answers for the JVM; nothing answered for
