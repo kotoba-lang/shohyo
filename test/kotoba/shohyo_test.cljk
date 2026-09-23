@@ -1,5 +1,5 @@
 (ns kotoba.shohyo-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [kotoba.shohyo :as shohyo]))
 
 (def ^:private chart
