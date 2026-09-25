@@ -55,7 +55,7 @@
   debit-positive figure stays on each line as `:balance` so nothing is lost."
   (:require [kotoba.lang.text :as str]
             #?(:clj [kotoba.lang.edn :as edn] :cljs [cljs.reader :as edn])
-            #?(:clj [clojure.java.io :as io])))
+            #?(:clj [kotoba.io :as io])))
 
 ;; ---------------------------------------------------------------------------
 ;; account types
